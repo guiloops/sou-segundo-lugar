@@ -624,10 +624,10 @@ function toggleSongList() {
             songListContent.appendChild(songItem);
         });
         
-        // Position the box above the message box on bottom right
+        // Position the box relative to the message box
         const messageRect = startMessage.getBoundingClientRect();
         const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        const offsetY = isMobile ? 80 : 20; // Space above message box (same on mobile and desktop)
+        const offsetY = isMobile ? 80 : 20; // Space between boxes (more space on mobile to avoid overlap)
         
         // First render to get dimensions
         songListBox.style.visibility = 'hidden';
@@ -638,19 +638,30 @@ function toggleSongList() {
             const boxHeight = songListBox.offsetHeight || 200;
             const boxWidth = songListBox.offsetWidth || 250;
             
-            // Position above the message box, right-aligned to match start message box (30px from right)
-            songListBox.style.right = '30px';
-            songListBox.style.bottom = `${window.innerHeight - messageRect.top + offsetY}px`;
-            songListBox.style.left = 'auto';
-            songListBox.style.top = 'auto';
+            if (isMobile) {
+                // Mobile: position below the start message box, left-aligned
+                songListBox.style.left = '30px';
+                songListBox.style.top = `${messageRect.bottom + offsetY}px`;
+                songListBox.style.right = 'auto';
+                songListBox.style.bottom = 'auto';
+            } else {
+                // Desktop: position above the message box, right-aligned
+                songListBox.style.right = '30px';
+                songListBox.style.bottom = `${window.innerHeight - messageRect.top + offsetY}px`;
+                songListBox.style.left = 'auto';
+                songListBox.style.top = 'auto';
+            }
             
             // Adjust if box goes off screen
             const rect = songListBox.getBoundingClientRect();
             if (rect.top < 0) {
-                songListBox.style.bottom = `${window.innerHeight - messageRect.bottom - offsetY}px`; // Show below instead
+                songListBox.style.top = `${messageRect.bottom + offsetY}px`;
             }
             if (rect.left < 0) {
-                songListBox.style.right = '30px';
+                songListBox.style.left = '30px';
+            }
+            if (rect.bottom > window.innerHeight) {
+                songListBox.style.top = `${messageRect.top - boxHeight - offsetY}px`; // Show above instead
             }
             
             songListBox.classList.add('visible');
