@@ -135,42 +135,24 @@ class Character {
     draw() {
         if (!spriteSheetLoaded || !spriteSheet || this.validFrames.length === 0) return;
         
+        // Don't draw center character on mobile
+        const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        if (this.isCenterCharacter && isMobile) {
+            return;
+        }
+        
         // Calculate source position in spritesheet using frame mapping
         const { row, col } = frameIndexToRowCol(this.currentFrame);
         
         const sourceX = col * SPRITE_WIDTH;
         const sourceY = row * SPRITE_HEIGHT;
         
-        // Check if we need to flip vertically (center character on mobile)
-        const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        const shouldFlip = this.isCenterCharacter && isMobile;
-        
-        if (shouldFlip) {
-            // Save the context state
-            ctx.save();
-            
-            // Translate to the center of the character, flip vertically, then translate back
-            ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
-            ctx.scale(1, -1); // Flip vertically
-            ctx.translate(-(this.x + this.width / 2), -(this.y + this.height / 2));
-            
-            // Draw the sprite frame at this character's position
-            ctx.drawImage(
-                spriteSheet,
-                sourceX, sourceY, SPRITE_WIDTH, SPRITE_HEIGHT, // Source rectangle
-                this.x, this.y, this.width, this.height         // Destination rectangle
-            );
-            
-            // Restore the context state
-            ctx.restore();
-        } else {
-            // Draw the sprite frame at this character's position
-            ctx.drawImage(
-                spriteSheet,
-                sourceX, sourceY, SPRITE_WIDTH, SPRITE_HEIGHT, // Source rectangle
-                this.x, this.y, this.width, this.height         // Destination rectangle
-            );
-        }
+        // Draw the sprite frame at this character's position
+        ctx.drawImage(
+            spriteSheet,
+            sourceX, sourceY, SPRITE_WIDTH, SPRITE_HEIGHT, // Source rectangle
+            this.x, this.y, this.width, this.height         // Destination rectangle
+        );
     }
     
     getBounds() {
@@ -513,27 +495,20 @@ function loadSpriteSheet() {
         function centerCharacterOnScreen() {
             if (centerCharacter) {
                 const startMessage = document.getElementById('startMessage');
-                const isPortraitMobile = window.innerWidth <= 480 && window.innerHeight > window.innerWidth;
                 
                 if (startMessage) {
                     const messageRect = startMessage.getBoundingClientRect();
                     
-                    if (isPortraitMobile) {
-                        // On portrait mobile: position at top left, in front of scroll bar
-                        centerCharacter.x = 5;
-                        centerCharacter.y = 5; // Top of screen, overlapping scroll bar
-                    } else {
-                        // Desktop/iPad: position above the message box, aligned to the left edge
-                        const offsetX = CENTER_CHARACTER_OFFSET_X;
-                        const offsetY = CENTER_CHARACTER_OFFSET_Y;
-                        const spacing = 20;
-                        
-                        const leftX = messageRect.left + offsetX;
-                        const aboveY = messageRect.top - SPRITE_HEIGHT * SCALE - spacing + offsetY;
-                        
-                        centerCharacter.x = leftX;
-                        centerCharacter.y = aboveY;
-                    }
+                    // Desktop: position above the message box, aligned to the left edge
+                    const offsetX = CENTER_CHARACTER_OFFSET_X;
+                    const offsetY = CENTER_CHARACTER_OFFSET_Y;
+                    const spacing = 20;
+                    
+                    const leftX = messageRect.left + offsetX;
+                    const aboveY = messageRect.top - SPRITE_HEIGHT * SCALE - spacing + offsetY;
+                    
+                    centerCharacter.x = leftX;
+                    centerCharacter.y = aboveY;
                 } else {
                     // Fallback to left side if message box not found
                     centerCharacter.x = 30;
@@ -546,7 +521,10 @@ function loadSpriteSheet() {
         window.addEventListener('resize', () => {
             canvas.width = window.innerWidth || 800;
             canvas.height = window.innerHeight || 600;
-            centerCharacterOnScreen();
+            // Only reposition center character if it exists (not on mobile)
+            if (centerCharacter) {
+                centerCharacterOnScreen();
+            }
         });
         
         spriteSheetLoaded = true;
@@ -566,21 +544,20 @@ function loadSpriteSheet() {
         // Wait 100ms before showing character
         setTimeout(() => {
             characters = [];
-            // Position above the title box on the left
-            const startMessage = document.getElementById('startMessage');
-            const isPortraitMobile = window.innerWidth <= 480 && window.innerHeight > window.innerWidth;
-            let centerX = 30; // Default left position
-            let centerY = 100; // Default top position
             
-            if (startMessage) {
-                const messageRect = startMessage.getBoundingClientRect();
+            // Check if mobile - don't show center character on mobile
+            const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            if (!isMobile) {
+                // Position above the title box on the left (desktop only)
+                const startMessage = document.getElementById('startMessage');
+                let centerX = 30; // Default left position
+                let centerY = 100; // Default top position
                 
-                if (isPortraitMobile) {
-                    // On portrait mobile: position at top left, in front of scroll bar
-                    centerX = -20;
-                    centerY = 48; // Top of screen, overlapping scroll bar
-                } else {
-                    // Desktop/iPad: position above the message box, aligned to the left edge
+                if (startMessage) {
+                    const messageRect = startMessage.getBoundingClientRect();
+                    
+                    // Desktop: position above the message box, aligned to the left edge
                     const offsetX = CENTER_CHARACTER_OFFSET_X;
                     const offsetY = CENTER_CHARACTER_OFFSET_Y;
                     const spacing = 20;
@@ -588,10 +565,13 @@ function loadSpriteSheet() {
                     centerX = messageRect.left + offsetX;
                     centerY = messageRect.top - SPRITE_HEIGHT * SCALE - spacing + offsetY;
                 }
+                
+                centerCharacter = new Character(centerX, centerY, true); // true = isCenterCharacter
+                characters.push(centerCharacter);
+            } else {
+                // Mobile: don't create center character
+                centerCharacter = null;
             }
-            
-            centerCharacter = new Character(centerX, centerY, true); // true = isCenterCharacter
-            characters.push(centerCharacter);
             
             // Set default cursor
             canvas.style.cursor = 'default';
