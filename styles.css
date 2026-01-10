@@ -12,11 +12,15 @@ body {
     min-height: 100vh;
     margin: 0;
     padding: 0;
-    -webkit-tap-highlight-color: transparent;
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    user-select: none;
-    touch-action: manipulation;
+}
+
+body.mobile {
+    transform: scale(0.5);
+    transform-origin: top left;
+    width: 200vw;
+    height: 200vh;
+    overflow-x: hidden;
+    overflow-y: hidden;
 }
 
 .animation-container {
@@ -25,7 +29,7 @@ body {
     left: 0;
     width: 100vw;
     height: 100vh;
-    z-index: 10;
+    z-index: 2000;
 }
 
 #spriteCanvas {
@@ -33,11 +37,9 @@ body {
     image-rendering: -moz-crisp-edges;
     image-rendering: crisp-edges;
     display: block;
-    background: lightgrey;
+    background: transparent;
     width: 100%;
     height: 100%;
-    touch-action: none;
-    -webkit-tap-highlight-color: transparent;
 }
 
 .top-scroll-bar {
@@ -165,8 +167,6 @@ body {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3) !important;
     margin: 0 !important;
     transition: background-color 0.2s ease !important;
-    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
-    touch-action: manipulation;
 }
 
 .start-message:hover {
@@ -271,8 +271,6 @@ body {
     margin-bottom: 4px !important;
     padding: 2px 0 !important;
     cursor: pointer !important;
-    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
-    touch-action: manipulation;
 }
 
 .song-list-item:hover {
@@ -281,190 +279,4 @@ body {
 
 .song-list-item:last-child {
     margin-bottom: 0 !important;
-}
-
-/* Mobile Responsive Styles */
-@media screen and (max-width: 768px) {
-    /* Adjust scroll bar for mobile */
-    .top-scroll-bar {
-        height: 50px;
-    }
-    
-    .scroll-content {
-        height: 50px;
-    }
-    
-    .scroll-text-item {
-        font-size: 24px;
-        line-height: 50px;
-        letter-spacing: 1px;
-    }
-    
-    /* Adjust start message box for mobile - scale everything down */
-    .start-message {
-        bottom: 15px !important;
-        right: 15px !important;
-        left: 15px !important;
-        padding: 8px 12px !important;
-        max-width: calc(100% - 30px) !important;
-        border-width: 2px !important;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
-    }
-    
-    .start-message .main-text {
-        font-size: 24px !important;
-        letter-spacing: 1.5px !important;
-    }
-    
-    .start-message .author-text {
-        font-size: 12px !important;
-        letter-spacing: 0.5px !important;
-    }
-    
-    .start-message .play-stop-icon {
-        font-size: 14px !important;
-        bottom: 6px !important;
-        left: 12px !important;
-        letter-spacing: 0 !important;
-        font-weight: normal !important;
-        line-height: 1 !important;
-    }
-    
-    .start-message .timer-text {
-        font-size: 12px !important;
-        bottom: 6px !important;
-        left: 32px !important;
-        letter-spacing: 0.5px !important;
-    }
-    
-    /* Adjust song list box for mobile */
-    .song-list-box {
-        bottom: 20px !important;
-        right: 20px !important;
-        left: 20px !important;
-        max-width: calc(100% - 40px) !important;
-        max-height: 50vh !important;
-        padding: 12px 16px !important;
-    }
-    
-    .song-list-item {
-        font-size: 13px !important;
-        padding: 4px 0 !important;
-        margin-bottom: 6px !important;
-    }
-}
-
-@media screen and (max-width: 480px) {
-    /* Extra small mobile devices */
-    .top-scroll-bar {
-        height: 45px;
-    }
-    
-    .scroll-content {
-        height: 45px;
-    }
-    
-    .scroll-text-item {
-        font-size: 20px;
-        line-height: 45px;
-        letter-spacing: 0.5px;
-    }
-    
-    .start-message {
-        bottom: 12px !important;
-        right: 12px !important;
-        left: 12px !important;
-        padding: 6px 10px !important;
-        max-width: calc(100% - 24px) !important;
-        border-width: 2px !important;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
-    }
-    
-    .start-message .main-text {
-        font-size: 20px !important;
-        letter-spacing: 1px !important;
-    }
-    
-    .start-message .author-text {
-        font-size: 11px !important;
-        letter-spacing: 0.5px !important;
-    }
-    
-    .start-message .play-stop-icon {
-        font-size: 12px !important;
-        bottom: 5px !important;
-        left: 10px !important;
-        letter-spacing: 0 !important;
-        font-weight: normal !important;
-        line-height: 1 !important;
-    }
-    
-    .start-message .timer-text {
-        font-size: 11px !important;
-        bottom: 5px !important;
-        left: 28px !important;
-        letter-spacing: 0.5px !important;
-    }
-    
-    .song-list-box {
-        bottom: 15px !important;
-        right: 15px !important;
-        left: 15px !important;
-        max-width: calc(100% - 30px) !important;
-        max-height: 45vh !important;
-        padding: 10px 14px !important;
-    }
-    
-    .song-list-item {
-        font-size: 12px !important;
-        padding: 3px 0 !important;
-        margin-bottom: 5px !important;
-    }
-}
-
-/* Touch-friendly adjustments */
-@media (hover: none) and (pointer: coarse) {
-    /* Touch devices */
-    .start-message {
-        min-height: 60px !important;
-    }
-    
-    .song-list-item {
-        min-height: 32px !important;
-        padding: 8px 0 !important;
-    }
-}
-
-/* Landscape mobile orientation */
-@media screen and (max-width: 896px) and (orientation: landscape) {
-    .top-scroll-bar {
-        height: 40px;
-    }
-    
-    .scroll-content {
-        height: 40px;
-    }
-    
-    .scroll-text-item {
-        font-size: 18px;
-        line-height: 40px;
-    }
-    
-    .start-message {
-        bottom: 15px !important;
-        right: 15px !important;
-        padding: 8px 14px !important;
-    }
-    
-    .start-message .main-text {
-        font-size: 22px !important;
-    }
-    
-    .start-message .author-text {
-        font-size: 11px !important;
-    }
-    
-    .song-list-box {
-        max-height: 60vh !important;
-    }
 }

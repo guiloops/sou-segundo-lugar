@@ -24,6 +24,8 @@ const CENTER_CHARACTER_OFFSET_Y = 41; // Adjust vertical position (positive = do
 // Global data
 let framesByRow = {}; // Store frames grouped by row
 let validRows = []; // Store all valid row indices
+let frameToRowCol = {}; // Map frame index to {row, col} for variable frames per row
+let maxFramesPerRow = FRAMES_PER_ROW || 5; // Maximum frames in any row (default to FRAMES_PER_ROW)
 
 // Character class
 class Character {
@@ -44,11 +46,32 @@ class Character {
         this.initialFrameDuration = 10000; // 10 seconds in milliseconds
         
         if (isCenterCharacter) {
-            // Set to second frame from row 32 (1-indexed, so row 31 in 0-indexed)
-            const targetRow = 31; // Row 32 in 1-indexed = row 31 in 0-indexed
-            const frameIndexInRow = 2; // Second frame (0-indexed)
-            const framesPerRow = FRAMES_PER_ROW || 5;
-            this.currentFrame = targetRow * framesPerRow + frameIndexInRow;
+            // Check if mobile
+            const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            if (isMobile) {
+                // Mobile: Set to frame from row 20 (0-indexed: row 19)
+                // Find the frame in that row at the specified index
+                const targetRow = 20; // Row 20 in 1-indexed = row 19 in 0-indexed
+                const frameIndexInRow = 5; // Frame index within that row
+                if (framesByRow[targetRow] && framesByRow[targetRow].length > frameIndexInRow) {
+                    this.currentFrame = framesByRow[targetRow][frameIndexInRow];
+                } else {
+                    // Fallback: use max frames per row calculation
+                    this.currentFrame = targetRow * maxFramesPerRow + frameIndexInRow;
+                }
+            } else {
+                // Desktop: Set to frame from row 32 (0-indexed: row 31)
+                // Find the frame in that row at the specified index
+                const targetRow = 31; // Row 32 in 1-indexed = row 31 in 0-indexed
+                const frameIndexInRow = 2; // Frame index within that row
+                if (framesByRow[targetRow] && framesByRow[targetRow].length > frameIndexInRow) {
+                    this.currentFrame = framesByRow[targetRow][frameIndexInRow];
+                } else {
+                    // Fallback: use max frames per row calculation
+                    this.currentFrame = targetRow * maxFramesPerRow + frameIndexInRow;
+                }
+            }
             this.validFrames = [this.currentFrame]; // Just this one frame for now
         } else {
             this.selectRandomRow();
@@ -112,20 +135,42 @@ class Character {
     draw() {
         if (!spriteSheetLoaded || !spriteSheet || this.validFrames.length === 0) return;
         
-        // Calculate source position in spritesheet
-        const framesPerRow = FRAMES_PER_ROW || Math.floor(spriteSheet.width / SPRITE_WIDTH);
-        const row = Math.floor(this.currentFrame / framesPerRow);
-        const col = this.currentFrame % framesPerRow;
+        // Calculate source position in spritesheet using frame mapping
+        const { row, col } = frameIndexToRowCol(this.currentFrame);
         
         const sourceX = col * SPRITE_WIDTH;
         const sourceY = row * SPRITE_HEIGHT;
         
-        // Draw the sprite frame at this character's position
-        ctx.drawImage(
-            spriteSheet,
-            sourceX, sourceY, SPRITE_WIDTH, SPRITE_HEIGHT, // Source rectangle
-            this.x, this.y, this.width, this.height         // Destination rectangle
-        );
+        // Check if we need to flip vertically (center character on mobile)
+        const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const shouldFlip = this.isCenterCharacter && isMobile;
+        
+        if (shouldFlip) {
+            // Save the context state
+            ctx.save();
+            
+            // Translate to the center of the character, flip vertically, then translate back
+            ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
+            ctx.scale(1, -1); // Flip vertically
+            ctx.translate(-(this.x + this.width / 2), -(this.y + this.height / 2));
+            
+            // Draw the sprite frame at this character's position
+            ctx.drawImage(
+                spriteSheet,
+                sourceX, sourceY, SPRITE_WIDTH, SPRITE_HEIGHT, // Source rectangle
+                this.x, this.y, this.width, this.height         // Destination rectangle
+            );
+            
+            // Restore the context state
+            ctx.restore();
+        } else {
+            // Draw the sprite frame at this character's position
+            ctx.drawImage(
+                spriteSheet,
+                sourceX, sourceY, SPRITE_WIDTH, SPRITE_HEIGHT, // Source rectangle
+                this.x, this.y, this.width, this.height         // Destination rectangle
+            );
+        }
     }
     
     getBounds() {
@@ -154,11 +199,22 @@ let audioDuration = 0; // Total duration of the audio file in seconds
 let songListVisible = false; // Track if song list is visible
 let lastCurrentSong = null; // Track the last current song to detect changes
 
+// Convert frame index to row and column, accounting for variable frames per row
+function frameIndexToRowCol(frameIndex) {
+    // If we have the mapping, use it
+    if (frameToRowCol[frameIndex]) {
+        return frameToRowCol[frameIndex];
+    }
+    
+    // Fallback: calculate using max frames per row
+    const row = Math.floor(frameIndex / maxFramesPerRow);
+    const col = frameIndex % maxFramesPerRow;
+    return { row, col };
+}
+
 // Check if a frame is blank (all transparent or all same color)
 function isFrameBlank(frameIndex) {
-    const framesPerRow = FRAMES_PER_ROW || Math.floor(spriteSheet.width / SPRITE_WIDTH);
-    const row = Math.floor(frameIndex / framesPerRow);
-    const col = frameIndex % framesPerRow;
+    const { row, col } = frameIndexToRowCol(frameIndex);
     
     const sourceX = col * SPRITE_WIDTH;
     const sourceY = row * SPRITE_HEIGHT;
@@ -210,20 +266,36 @@ function isFrameBlank(frameIndex) {
 
 // Detect valid (non-blank) frames and group by row
 function detectValidFrames() {
-    const framesPerRow = FRAMES_PER_ROW || Math.floor(spriteSheet.width / SPRITE_WIDTH);
+    // Calculate maximum possible frames per row from spritesheet width
+    maxFramesPerRow = Math.floor(spriteSheet.width / SPRITE_WIDTH);
     const rows = Math.floor(spriteSheet.height / SPRITE_HEIGHT);
-    const totalFrames = framesPerRow * rows;
+    const totalFrames = maxFramesPerRow * rows;
     
-    // Group valid frames by row
+    // Reset mappings
     framesByRow = {};
+    frameToRowCol = {};
+    
+    // Detect all valid frames and determine actual row/col for each
     for (let i = 0; i < totalFrames; i++) {
         if (!isFrameBlank(i)) {
-            const row = Math.floor(i / framesPerRow);
+            // Calculate row and col for this frame
+            const row = Math.floor(i / maxFramesPerRow);
+            const col = i % maxFramesPerRow;
+            
+            // Store row/col mapping for this frame
+            frameToRowCol[i] = { row, col };
+            
+            // Group by row
             if (!framesByRow[row]) {
                 framesByRow[row] = [];
             }
             framesByRow[row].push(i);
         }
+    }
+    
+    // Sort frames in each row to ensure sequential order
+    for (let row in framesByRow) {
+        framesByRow[row].sort((a, b) => a - b);
     }
     
     // Get all rows that have valid frames
@@ -354,6 +426,54 @@ function removeCharactersOneByOne() {
     });
 }
 
+// Reset everything to initial state (as if page just loaded)
+function resetToInitialState() {
+    // Reset game state
+    gameStarted = false;
+    elapsedTime = 0;
+    startTime = null;
+    hasEverStarted = false;
+    displayedSongs.clear();
+    lastCurrentSong = null;
+    
+    // Stop all timers
+    if (songTimer) {
+        clearInterval(songTimer);
+        songTimer = null;
+    }
+    if (spawnTimer) {
+        clearTimeout(spawnTimer);
+        spawnTimer = null;
+    }
+    
+    // Reset audio to beginning
+    if (backgroundAudio) {
+        backgroundAudio.currentTime = 0;
+        backgroundAudio.pause();
+    }
+    
+    // Update play/stop icon to play
+    const playStopIcon = document.getElementById('playStopIcon');
+    if (playStopIcon) {
+        playStopIcon.textContent = '▶';
+        playStopIcon.innerHTML = '▶';
+    }
+    
+    // Clear the scroll content
+    const scrollContent = document.getElementById('scrollContent');
+    if (scrollContent) {
+        scrollContent.innerHTML = '';
+        scrollContent.style.opacity = '0';
+        scrollContent.style.visibility = 'hidden';
+    }
+    
+    // Remove all characters except center character
+    removeCharactersOneByOne();
+    
+    // Update timer display to show 0:00
+    updateTimer();
+}
+
 // Check if mouse is over any character
 function isMouseOverCharacter(mouseX, mouseY) {
     for (let character of characters) {
@@ -393,27 +513,17 @@ function loadSpriteSheet() {
         function centerCharacterOnScreen() {
             if (centerCharacter) {
                 const startMessage = document.getElementById('startMessage');
+                const isPortraitMobile = window.innerWidth <= 480 && window.innerHeight > window.innerWidth;
+                
                 if (startMessage) {
                     const messageRect = startMessage.getBoundingClientRect();
-                    const isMobile = window.innerWidth <= 768;
                     
-                    if (isMobile) {
-                        // On mobile: position character above the message box in the top area
-                        // Since box is full width, position in top-left area
-                        const spacing = 15;
-                        const leftX = 20; // Fixed left position
-                        const aboveY = messageRect.top - SPRITE_HEIGHT * SCALE - spacing; // Above the box
-                        
-                        // Ensure character doesn't go off screen on mobile
-                        const minX = 10;
-                        const maxX = canvas.width - centerCharacter.width - 10;
-                        const minY = 70; // Below scroll bar
-                        const maxY = canvas.height - centerCharacter.height - 10;
-                        
-                        centerCharacter.x = Math.max(minX, Math.min(maxX, leftX));
-                        centerCharacter.y = Math.max(minY, Math.min(maxY, aboveY));
+                    if (isPortraitMobile) {
+                        // On portrait mobile: position at top left, in front of scroll bar
+                        centerCharacter.x = 5;
+                        centerCharacter.y = 5; // Top of screen, overlapping scroll bar
                     } else {
-                        // Desktop: position above the message box, aligned to the left edge
+                        // Desktop/iPad: position above the message box, aligned to the left edge
                         const offsetX = CENTER_CHARACTER_OFFSET_X;
                         const offsetY = CENTER_CHARACTER_OFFSET_Y;
                         const spacing = 20;
@@ -426,9 +536,8 @@ function loadSpriteSheet() {
                     }
                 } else {
                     // Fallback to left side if message box not found
-                    const isMobile = window.innerWidth <= 768;
-                    centerCharacter.x = isMobile ? 15 : 30;
-                    centerCharacter.y = isMobile ? 80 : 100;
+                    centerCharacter.x = 30;
+                    centerCharacter.y = 100;
                 }
             }
         }
@@ -459,30 +568,19 @@ function loadSpriteSheet() {
             characters = [];
             // Position above the title box on the left
             const startMessage = document.getElementById('startMessage');
-            const isMobile = window.innerWidth <= 768;
-            let centerX = isMobile ? 15 : 30; // Default left position
-            let centerY = isMobile ? 80 : 100; // Default top position
+            const isPortraitMobile = window.innerWidth <= 480 && window.innerHeight > window.innerWidth;
+            let centerX = 30; // Default left position
+            let centerY = 100; // Default top position
             
             if (startMessage) {
                 const messageRect = startMessage.getBoundingClientRect();
                 
-                if (isMobile) {
-                    // On mobile: position character above the message box in the top area
-                    // Since box is full width, position in top-left area
-                    const spacing = 15;
-                    centerX = 20; // Fixed left position
-                    centerY = messageRect.top - SPRITE_HEIGHT * SCALE - spacing; // Above the box
-                    
-                    // Ensure character doesn't go off screen on mobile
-                    const minX = 10;
-                    const maxX = canvas.width - SPRITE_WIDTH * SCALE - 10;
-                    const minY = 70; // Below scroll bar
-                    const maxY = canvas.height - SPRITE_HEIGHT * SCALE - 10;
-                    
-                    centerX = Math.max(minX, Math.min(maxX, centerX));
-                    centerY = Math.max(minY, Math.min(maxY, centerY));
+                if (isPortraitMobile) {
+                    // On portrait mobile: position at top left, in front of scroll bar
+                    centerX = -20;
+                    centerY = 48; // Top of screen, overlapping scroll bar
                 } else {
-                    // Desktop: position above the message box, aligned to the left edge
+                    // Desktop/iPad: position above the message box, aligned to the left edge
                     const offsetX = CENTER_CHARACTER_OFFSET_X;
                     const offsetY = CENTER_CHARACTER_OFFSET_Y;
                     const spacing = 20;
@@ -501,41 +599,6 @@ function loadSpriteSheet() {
             // Add event listeners to canvas
             canvas.addEventListener('click', handleCanvasClick);
             canvas.addEventListener('mousemove', handleCanvasMouseMove);
-            
-            // Add touch support for mobile
-            canvas.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                const touch = e.touches[0];
-                const rect = canvas.getBoundingClientRect();
-                const touchX = touch.clientX - rect.left;
-                const touchY = touch.clientY - rect.top;
-                
-                // Check if touch is on any character
-                let touchedCharacter = null;
-                for (let character of characters) {
-                    const charBounds = character.getBounds();
-                    if (touchX >= charBounds.x && 
-                        touchX <= charBounds.x + charBounds.width &&
-                        touchY >= charBounds.y && 
-                        touchY <= charBounds.y + charBounds.height) {
-                        touchedCharacter = character;
-                        break;
-                    }
-                }
-                
-                if (touchedCharacter) {
-                    toggleSongList();
-                } else {
-                    // Touch outside any character - close song list if open
-                    if (songListVisible) {
-                        const songListBox = document.getElementById('songListBox');
-                        if (songListBox) {
-                            songListBox.classList.remove('visible');
-                            songListVisible = false;
-                        }
-                    }
-                }
-            }, { passive: false });
         }, 100);
     };
     spriteSheet.onerror = () => {
@@ -576,7 +639,8 @@ function toggleSongList() {
         
         // Position the box above the message box on bottom right
         const messageRect = startMessage.getBoundingClientRect();
-        const offsetY = 20; // Space above message box
+        const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const offsetY = isMobile ? 80 : 20; // Space above message box (same on mobile and desktop)
         
         // First render to get dimensions
         songListBox.style.visibility = 'hidden';
@@ -587,8 +651,8 @@ function toggleSongList() {
             const boxHeight = songListBox.offsetHeight || 200;
             const boxWidth = songListBox.offsetWidth || 250;
             
-            // Position above the message box, right-aligned
-            songListBox.style.right = `${window.innerWidth - messageRect.right}px`;
+            // Position above the message box, right-aligned to match start message box (30px from right)
+            songListBox.style.right = '30px';
             songListBox.style.bottom = `${window.innerHeight - messageRect.top + offsetY}px`;
             songListBox.style.left = 'auto';
             songListBox.style.top = 'auto';
@@ -665,9 +729,8 @@ function startAnimation() {
             canvas.height = window.innerHeight || 600;
         }
         
-        // Clear canvas with white background
-        ctx.fillStyle = 'lightgrey';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Clear canvas with transparent background
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         
         // Update and draw all characters (only animate if game started)
         for (let character of characters) {
@@ -829,17 +892,7 @@ function handleMessageBoxClick() {
         
         // Update icon to stop
         if (playStopIcon) {
-            const isMobile = window.innerWidth <= 768;
-            if (isMobile) {
-                // Use a better pause symbol for mobile
-                playStopIcon.textContent = '⏸';
-                playStopIcon.innerHTML = '⏸';
-                playStopIcon.style.fontSize = '14px';
-            } else {
-                playStopIcon.textContent = '⏸';
-                playStopIcon.innerHTML = '⏸';
-                playStopIcon.style.fontSize = '';
-            }
+            playStopIcon.textContent = '⏸';
         }
         
         // Resume all scroll text animations
@@ -896,15 +949,54 @@ function handleMessageBoxClick() {
             if (scrollContent) {
                 scrollContent.innerHTML = '';
             }
+            
+            // Start timer from 0 when music starts for the first time
+            startTime = Date.now();
+        } else {
+            // Resume: calculate startTime so timer continues from current elapsedTime
+            startTime = Date.now() - (elapsedTime * 1000);
         }
         
-        // Start timer from 0 when music starts
-        startTime = Date.now();
-        elapsedTime = 0;
-        updateTimer(); // Update timer display to show 0:00
+        updateTimer(); // Update timer display
         
         songTimer = setInterval(() => {
             elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+            
+            // Check if timer has reached the end
+            if (elapsedTime >= audioDuration && audioDuration > 0) {
+                // Stop the timer and keep it at the end
+                elapsedTime = audioDuration;
+                updateTimer();
+                
+                // Stop the game
+                gameStarted = false;
+                
+                // Stop the timer interval
+                if (songTimer) {
+                    clearInterval(songTimer);
+                    songTimer = null;
+                }
+                
+                // Pause audio
+                if (backgroundAudio) {
+                    backgroundAudio.pause();
+                }
+                
+                // Update play/stop icon to play
+                const playStopIcon = document.getElementById('playStopIcon');
+                if (playStopIcon) {
+                    playStopIcon.textContent = '▶';
+                    playStopIcon.innerHTML = '▶';
+                }
+                
+                // Wait a moment at 17:30, then reset everything
+                setTimeout(() => {
+                    resetToInitialState();
+                }, 2000); // Wait 2 seconds at 17:30 before resetting
+                
+                return;
+            }
+            
             updateScrollText();
             updateTimer(); // Update timer display
         }, 100); // Update every 100ms for smooth transitions
@@ -997,8 +1089,24 @@ async function loadSongs() {
     }
 }
 
+// Function to detect and apply mobile scaling
+function detectMobile() {
+    const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) {
+        document.body.classList.add('mobile');
+    } else {
+        document.body.classList.remove('mobile');
+    }
+}
+
 // Initialize when page loads
 window.addEventListener('DOMContentLoaded', async () => {
+    // Detect mobile device and scale down
+    detectMobile();
+    
+    // Update on resize
+    window.addEventListener('resize', detectMobile);
+    
     // Load songs first
     await loadSongs();
     
@@ -1072,9 +1180,13 @@ window.addEventListener('DOMContentLoaded', async () => {
         console.log('- volume:', backgroundAudio.volume);
     }, 1000);
     
-    // When audio ends, remove all characters except center character one by one
+    // When audio ends, set timer to end and then reset
     backgroundAudio.addEventListener('ended', () => {
-        // Set game as stopped first
+        // Set elapsed time to end (17:30)
+        elapsedTime = audioDuration;
+        updateTimer();
+        
+        // Stop the game
         gameStarted = false;
         
         // Stop the timer
@@ -1090,16 +1202,10 @@ window.addEventListener('DOMContentLoaded', async () => {
             playStopIcon.innerHTML = '▶';
         }
         
-        // Clear the top bar (scroll content)
-        const scrollContent = document.getElementById('scrollContent');
-        if (scrollContent) {
-            scrollContent.innerHTML = '';
-            scrollContent.style.opacity = '0';
-            scrollContent.style.visibility = 'hidden';
-        }
-        
-        // Remove characters one by one
-        removeCharactersOneByOne();
+        // Wait a moment at 17:30, then reset everything
+        setTimeout(() => {
+            resetToInitialState();
+        }, 2000); // Wait 2 seconds at 17:30 before resetting
     });
     
     // Set up media session for media key controls

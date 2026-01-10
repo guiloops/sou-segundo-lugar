@@ -30,7 +30,7 @@ An interactive web experience featuring animated sprites, music playback, and dy
 ├── README.md
 ├── character-spritesheet.png
 └── album/
-    ├── masters_-14lufs.wav
+    ├── masters.mp3
     └── songs.txt
 ```
 
