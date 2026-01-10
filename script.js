@@ -396,23 +396,33 @@ function loadSpriteSheet() {
                 if (startMessage) {
                     const messageRect = startMessage.getBoundingClientRect();
                     const isMobile = window.innerWidth <= 768;
-                    // Adjust offsets for mobile
-                    const offsetX = isMobile ? CENTER_CHARACTER_OFFSET_X * 0.7 : CENTER_CHARACTER_OFFSET_X;
-                    const offsetY = isMobile ? CENTER_CHARACTER_OFFSET_Y * 0.7 : CENTER_CHARACTER_OFFSET_Y;
-                    const spacing = isMobile ? 15 : 20;
                     
-                    // Position above the message box, aligned to the left edge of the box
-                    const leftX = messageRect.left + offsetX;
-                    const aboveY = messageRect.top - SPRITE_HEIGHT * SCALE - spacing + offsetY;
-                    
-                    // Ensure character doesn't go off screen on mobile
-                    const minX = 10;
-                    const maxX = canvas.width - centerCharacter.width - 10;
-                    const minY = 70; // Below scroll bar
-                    const maxY = canvas.height - centerCharacter.height - 10;
-                    
-                    centerCharacter.x = Math.max(minX, Math.min(maxX, leftX));
-                    centerCharacter.y = Math.max(minY, Math.min(maxY, aboveY));
+                    if (isMobile) {
+                        // On mobile: position character to the left of the message box, above it
+                        const spacing = 15;
+                        const leftX = messageRect.left - SPRITE_WIDTH * SCALE - spacing;
+                        const aboveY = messageRect.top - SPRITE_HEIGHT * SCALE * 0.5; // Slightly above
+                        
+                        // Ensure character doesn't go off screen on mobile
+                        const minX = 10;
+                        const maxX = canvas.width - centerCharacter.width - 10;
+                        const minY = 70; // Below scroll bar
+                        const maxY = canvas.height - centerCharacter.height - 10;
+                        
+                        centerCharacter.x = Math.max(minX, Math.min(maxX, leftX));
+                        centerCharacter.y = Math.max(minY, Math.min(maxY, aboveY));
+                    } else {
+                        // Desktop: position above the message box, aligned to the left edge
+                        const offsetX = CENTER_CHARACTER_OFFSET_X;
+                        const offsetY = CENTER_CHARACTER_OFFSET_Y;
+                        const spacing = 20;
+                        
+                        const leftX = messageRect.left + offsetX;
+                        const aboveY = messageRect.top - SPRITE_HEIGHT * SCALE - spacing + offsetY;
+                        
+                        centerCharacter.x = leftX;
+                        centerCharacter.y = aboveY;
+                    }
                 } else {
                     // Fallback to left side if message box not found
                     const isMobile = window.innerWidth <= 768;
@@ -454,21 +464,30 @@ function loadSpriteSheet() {
             
             if (startMessage) {
                 const messageRect = startMessage.getBoundingClientRect();
-                const offsetX = isMobile ? CENTER_CHARACTER_OFFSET_X * 0.7 : CENTER_CHARACTER_OFFSET_X;
-                const offsetY = isMobile ? CENTER_CHARACTER_OFFSET_Y * 0.7 : CENTER_CHARACTER_OFFSET_Y;
-                const spacing = isMobile ? 15 : 20;
                 
-                centerX = messageRect.left + offsetX;
-                centerY = messageRect.top - SPRITE_HEIGHT * SCALE - spacing + offsetY;
-                
-                // Ensure character doesn't go off screen on mobile
-                const minX = 10;
-                const maxX = canvas.width - SPRITE_WIDTH * SCALE - 10;
-                const minY = 70; // Below scroll bar
-                const maxY = canvas.height - SPRITE_HEIGHT * SCALE - 10;
-                
-                centerX = Math.max(minX, Math.min(maxX, centerX));
-                centerY = Math.max(minY, Math.min(maxY, centerY));
+                if (isMobile) {
+                    // On mobile: position character to the left of the message box, above it
+                    const spacing = 15;
+                    centerX = messageRect.left - SPRITE_WIDTH * SCALE - spacing;
+                    centerY = messageRect.top - SPRITE_HEIGHT * SCALE * 0.5; // Slightly above
+                    
+                    // Ensure character doesn't go off screen on mobile
+                    const minX = 10;
+                    const maxX = canvas.width - SPRITE_WIDTH * SCALE - 10;
+                    const minY = 70; // Below scroll bar
+                    const maxY = canvas.height - SPRITE_HEIGHT * SCALE - 10;
+                    
+                    centerX = Math.max(minX, Math.min(maxX, centerX));
+                    centerY = Math.max(minY, Math.min(maxY, centerY));
+                } else {
+                    // Desktop: position above the message box, aligned to the left edge
+                    const offsetX = CENTER_CHARACTER_OFFSET_X;
+                    const offsetY = CENTER_CHARACTER_OFFSET_Y;
+                    const spacing = 20;
+                    
+                    centerX = messageRect.left + offsetX;
+                    centerY = messageRect.top - SPRITE_HEIGHT * SCALE - spacing + offsetY;
+                }
             }
             
             centerCharacter = new Character(centerX, centerY, true); // true = isCenterCharacter
