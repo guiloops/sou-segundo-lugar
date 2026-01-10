@@ -965,7 +965,9 @@ function handleMessageBoxClick() {
         
         // Update icon to stop
         if (playStopIcon) {
-            playStopIcon.textContent = '⏸';
+            const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            playStopIcon.textContent = isMobile ? '||' : '⏸';
+            playStopIcon.innerHTML = isMobile ? '||' : '⏸';
         }
         
         // Resume all scroll text animations
