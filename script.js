@@ -398,10 +398,11 @@ function loadSpriteSheet() {
                     const isMobile = window.innerWidth <= 768;
                     
                     if (isMobile) {
-                        // On mobile: position character to the left of the message box, above it
+                        // On mobile: position character above the message box in the top area
+                        // Since box is full width, position in top-left area
                         const spacing = 15;
-                        const leftX = messageRect.left - SPRITE_WIDTH * SCALE - spacing;
-                        const aboveY = messageRect.top - SPRITE_HEIGHT * SCALE * 0.5; // Slightly above
+                        const leftX = 20; // Fixed left position
+                        const aboveY = messageRect.top - SPRITE_HEIGHT * SCALE - spacing; // Above the box
                         
                         // Ensure character doesn't go off screen on mobile
                         const minX = 10;
@@ -466,10 +467,11 @@ function loadSpriteSheet() {
                 const messageRect = startMessage.getBoundingClientRect();
                 
                 if (isMobile) {
-                    // On mobile: position character to the left of the message box, above it
+                    // On mobile: position character above the message box in the top area
+                    // Since box is full width, position in top-left area
                     const spacing = 15;
-                    centerX = messageRect.left - SPRITE_WIDTH * SCALE - spacing;
-                    centerY = messageRect.top - SPRITE_HEIGHT * SCALE * 0.5; // Slightly above
+                    centerX = 20; // Fixed left position
+                    centerY = messageRect.top - SPRITE_HEIGHT * SCALE - spacing; // Above the box
                     
                     // Ensure character doesn't go off screen on mobile
                     const minX = 10;
@@ -827,7 +829,9 @@ function handleMessageBoxClick() {
         
         // Update icon to stop
         if (playStopIcon) {
-            playStopIcon.textContent = '⏸';
+            const isMobile = window.innerWidth <= 768;
+            playStopIcon.textContent = isMobile ? 'II' : '⏸';
+            playStopIcon.innerHTML = isMobile ? 'II' : '⏸';
         }
         
         // Resume all scroll text animations
@@ -921,6 +925,7 @@ function handleMessageBoxClick() {
         // Update icon to play
         if (playStopIcon) {
             playStopIcon.textContent = '▶';
+            playStopIcon.innerHTML = '▶';
         }
         
         // Pause all scroll text animations (but keep them visible and in place)

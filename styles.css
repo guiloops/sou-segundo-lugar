@@ -209,6 +209,14 @@ body {
     pointer-events: none !important;
 }
 
+/* Mobile-specific styling for pause icon */
+@media screen and (max-width: 768px) {
+    .start-message .play-stop-icon {
+        letter-spacing: -2px !important;
+        font-weight: bold !important;
+    }
+}
+
 .start-message .timer-text {
     position: absolute !important;
     bottom: 6px !important;
