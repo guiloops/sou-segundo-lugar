@@ -171,15 +171,18 @@ let spawnTimer = null;
 let gameStarted = false;
 let centerCharacter = null;
 let backgroundAudio = null;
-let songs = [];
+let songs = []; // Array of song objects: { title, filename }
+let currentSongIndex = 0; // Index of currently playing song
 let songTimer = null;
 let elapsedTime = 0; // Time elapsed since play was pressed (in seconds)
 let startTime = null; // Timestamp when play was pressed
 let hasEverStarted = false; // Track if game has ever been started
 let displayedSongs = new Set(); // Track which songs have been added to the scroll
-let audioDuration = 0; // Total duration of the audio file in seconds
+let audioDuration = 0; // Total duration of all songs combined (calculated dynamically)
 let songListVisible = false; // Track if song list is visible
 let lastCurrentSong = null; // Track the last current song to detect changes
+let songDurations = []; // Store duration of each song
+let cumulativeTimes = []; // Cumulative start time for each song
 
 // Convert frame index to row and column, accounting for variable frames per row
 function frameIndexToRowCol(frameIndex) {
@@ -428,10 +431,12 @@ function resetToInitialState() {
         spawnTimer = null;
     }
     
-    // Reset audio to beginning
-    if (backgroundAudio) {
-        backgroundAudio.currentTime = 0;
-        backgroundAudio.pause();
+    // Reset audio to beginning (load first song)
+    if (songs.length > 0) {
+        loadAndPlaySong(0, 0);
+        if (backgroundAudio) {
+            backgroundAudio.pause();
+        }
     }
     
     // Update play/stop icon to play
@@ -576,8 +581,9 @@ function loadSpriteSheet() {
             // Set default cursor
             canvas.style.cursor = 'default';
             
-            // Add event listeners to canvas
+            // Add event listeners to canvas (support both mouse and touch)
             canvas.addEventListener('click', handleCanvasClick);
+            canvas.addEventListener('touchstart', handleCanvasClick);
             canvas.addEventListener('mousemove', handleCanvasMouseMove);
         }, 100);
     };
@@ -603,14 +609,15 @@ function toggleSongList() {
         // Show the box and populate with song titles
         songListContent.innerHTML = '';
         
-        songs.forEach(song => {
+        songs.forEach((song, index) => {
             const songItem = document.createElement('div');
             songItem.className = 'song-list-item';
             songItem.textContent = song.title;
             
             // Add click handler to seek to song start time
             songItem.addEventListener('click', (e) => {
-                seekToSong(song.startTime);
+                const songStartTime = cumulativeTimes[index] || 0;
+                seekToSong(songStartTime);
                 e.stopPropagation(); // Prevent event bubbling
             });
             
@@ -652,13 +659,20 @@ function toggleSongList() {
     }
 }
 
-// Handle canvas click to detect any character click
+// Handle canvas click/touch to detect any character click
 function handleCanvasClick(event) {
     if (characters.length === 0) return;
     
     const rect = canvas.getBoundingClientRect();
-    const clickX = event.clientX - rect.left;
-    const clickY = event.clientY - rect.top;
+    // Support both mouse and touch events
+    const clientX = event.clientX !== undefined ? event.clientX : (event.touches && event.touches[0] ? event.touches[0].clientX : event.changedTouches[0].clientX);
+    const clientY = event.clientY !== undefined ? event.clientY : (event.touches && event.touches[0] ? event.touches[0].clientY : event.changedTouches[0].clientY);
+    
+    // Calculate click position relative to canvas
+    // Convert from displayed coordinates to canvas internal coordinates
+    // This accounts for any CSS transforms (like body.mobile scale(0.5))
+    const clickX = (clientX - rect.left) * (canvas.width / rect.width);
+    const clickY = (clientY - rect.top) * (canvas.height / rect.height);
     
     // Check if click is on any character
     let clickedCharacter = null;
@@ -677,6 +691,7 @@ function handleCanvasClick(event) {
         // Position box above the message box on bottom right
         toggleSongList();
         event.stopPropagation(); // Prevent event from bubbling
+        event.preventDefault(); // Prevent default touch behavior
     } else {
         // Click outside any character - close song list if open
         if (songListVisible) {
@@ -755,33 +770,41 @@ function updateTimer() {
 function updateScrollText() {
     if (songs.length === 0) return;
     
-    // Find the current song based on elapsed time
+    // Find the current song based on elapsed time and cumulative times
     let currentSong = null;
-    for (let song of songs) {
-        if (elapsedTime >= song.startTime && elapsedTime < song.endTime) {
-            currentSong = song;
+    let currentIndex = 0;
+    
+    for (let i = 0; i < songs.length; i++) {
+        const songStart = cumulativeTimes[i];
+        const songEnd = i < songs.length - 1 ? cumulativeTimes[i + 1] : audioDuration;
+        
+        if (elapsedTime >= songStart && elapsedTime < songEnd) {
+            currentSong = songs[i];
+            currentIndex = i;
             break;
         }
     }
     
     // If no song matches, use the last song or first song
     if (!currentSong) {
-        if (elapsedTime >= songs[songs.length - 1].endTime) {
+        if (elapsedTime >= audioDuration) {
             currentSong = songs[songs.length - 1];
+            currentIndex = songs.length - 1;
         } else {
             currentSong = songs[0];
+            currentIndex = 0;
         }
     }
     
     // Check if the current song has changed
     if (currentSong) {
-        const songKey = `${currentSong.title}-${currentSong.startTime}`;
-        const lastSongKey = lastCurrentSong ? `${lastCurrentSong.title}-${lastCurrentSong.startTime}` : null;
+        const songKey = `${currentSong.title}-${currentIndex}`;
+        const lastSongKey = lastCurrentSong ? `${lastCurrentSong.title}-${lastCurrentSong.index}` : null;
         
         if (songKey !== lastSongKey) {
             // Update scroll to show current song
             updateScrollWithCurrentSong(currentSong.title);
-            lastCurrentSong = currentSong;
+            lastCurrentSong = { ...currentSong, index: currentIndex };
         }
     }
 }
@@ -830,17 +853,32 @@ function updateScrollWithCurrentSong(songTitle) {
 
 // Seek audio to a specific time (in seconds)
 function seekToSong(startTimeSeconds) {
-    if (!backgroundAudio) return;
+    if (songs.length === 0) return;
     
-    // Seek the audio to the song's start time
-    backgroundAudio.currentTime = startTimeSeconds;
+    // Find which song corresponds to this time
+    let targetSongIndex = 0;
+    let timeInSong = 0;
+    
+    for (let i = 0; i < songs.length; i++) {
+        const songStart = cumulativeTimes[i];
+        const songEnd = i < songs.length - 1 ? cumulativeTimes[i + 1] : audioDuration;
+        
+        if (startTimeSeconds >= songStart && startTimeSeconds < songEnd) {
+            targetSongIndex = i;
+            timeInSong = startTimeSeconds - songStart;
+            break;
+        }
+    }
+    
+    // Load and play the target song
+    loadAndPlaySong(targetSongIndex, timeInSong);
     
     // If game is not started, start it
     if (!gameStarted) {
         handleMessageBoxClick();
     } else {
         // If audio is paused, resume it
-        if (backgroundAudio.paused) {
+        if (backgroundAudio && backgroundAudio.paused) {
             backgroundAudio.play().catch(error => {
                 console.error('Error playing audio:', error);
             });
@@ -858,6 +896,50 @@ function seekToSong(startTimeSeconds) {
     
     // Update scroll text to reflect the new current song
     updateScrollText();
+}
+
+// Load and play a specific song
+function loadAndPlaySong(songIndex, startTimeInSong = 0) {
+    if (songIndex < 0 || songIndex >= songs.length) return;
+    
+    currentSongIndex = songIndex;
+    const song = songs[songIndex];
+    
+    // Create new audio element for this song
+    if (backgroundAudio) {
+        backgroundAudio.pause();
+        backgroundAudio = null;
+    }
+    
+    backgroundAudio = new Audio(song.filename);
+    backgroundAudio.volume = 1.0;
+    backgroundAudio.currentTime = startTimeInSong;
+    
+    // When this song ends, play the next one
+    backgroundAudio.addEventListener('ended', () => {
+        if (currentSongIndex < songs.length - 1) {
+            // Play next song
+            loadAndPlaySong(currentSongIndex + 1, 0);
+            if (gameStarted && !backgroundAudio.paused) {
+                backgroundAudio.play().catch(error => {
+                    console.error('Error playing next song:', error);
+                });
+            }
+        } else {
+            // All songs finished
+            if (backgroundAudio) {
+                backgroundAudio.pause();
+            }
+            // This will be handled by the timer reaching the end
+        }
+    });
+    
+    // If game is started, play immediately
+    if (gameStarted) {
+        backgroundAudio.play().catch(error => {
+            console.error('Error playing audio:', error);
+        });
+    }
 }
 
 // Handle message box click to start/stop the game
@@ -882,6 +964,28 @@ function handleMessageBoxClick() {
             scrollItems.forEach(item => {
                 item.style.animationPlayState = 'running';
             });
+        }
+        
+        // Load first song if not already loaded, or resume current song
+        if (!backgroundAudio && songs.length > 0) {
+            // Calculate which song to play based on elapsed time
+            let targetSongIndex = 0;
+            let timeInSong = 0;
+            
+            if (elapsedTime > 0) {
+                for (let i = 0; i < songs.length; i++) {
+                    const songStart = cumulativeTimes[i];
+                    const songEnd = i < songs.length - 1 ? cumulativeTimes[i + 1] : audioDuration;
+                    
+                    if (elapsedTime >= songStart && elapsedTime < songEnd) {
+                        targetSongIndex = i;
+                        timeInSong = elapsedTime - songStart;
+                        break;
+                    }
+                }
+            }
+            
+            loadAndPlaySong(targetSongIndex, timeInSong);
         }
         
         // Start audio playback
@@ -940,7 +1044,13 @@ function handleMessageBoxClick() {
         updateTimer(); // Update timer display
         
         songTimer = setInterval(() => {
-            elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+            // Calculate elapsed time based on current song position
+            if (backgroundAudio && currentSongIndex < songs.length) {
+                const timeInCurrentSong = backgroundAudio.currentTime || 0;
+                elapsedTime = Math.floor(cumulativeTimes[currentSongIndex] + timeInCurrentSong);
+            } else {
+                elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+            }
             
             // Check if timer has reached the end
             if (elapsedTime >= audioDuration && audioDuration > 0) {
@@ -969,10 +1079,10 @@ function handleMessageBoxClick() {
                     playStopIcon.innerHTML = '▶';
                 }
                 
-                // Wait a moment at 17:30, then reset everything
+                // Wait a moment at the end, then reset everything
                 setTimeout(() => {
                     resetToInitialState();
-                }, 2000); // Wait 2 seconds at 17:30 before resetting
+                }, 2000); // Wait 2 seconds before resetting
                 
                 return;
             }
@@ -1050,22 +1160,54 @@ async function loadSongs() {
         const lines = text.split('\n').filter(line => line.trim());
         
         songs = [];
+        songDurations = [];
+        cumulativeTimes = [];
+        let cumulativeTime = 0;
+        
         for (let line of lines) {
-            // Parse format: "title startTime-endTime"
-            const match = line.match(/^(.+?)\s+(\d+:\d+)-(\d+:\d+)$/);
-            if (match) {
-                const title = match[1].trim();
-                const startTime = timeToSeconds(match[2]);
-                const endTime = timeToSeconds(match[3]);
-                songs.push({ title, startTime, endTime });
+            const title = line.trim();
+            if (title) {
+                const filename = `album/${title}.mp3`;
+                songs.push({ title, filename });
+                songDurations.push(0); // Will be set when audio loads
+                cumulativeTimes.push(cumulativeTime);
+                // cumulativeTime will be updated after we load durations
             }
         }
         
-        // Don't set initial scroll text - it will be added when the game starts
+        // Load durations for all songs
+        await loadSongDurations();
+        
+        // Calculate cumulative times and total duration
+        cumulativeTime = 0;
+        for (let i = 0; i < songs.length; i++) {
+            cumulativeTimes[i] = cumulativeTime;
+            cumulativeTime += songDurations[i];
+        }
+        audioDuration = cumulativeTime;
+        
     } catch (error) {
         console.error('Error loading songs.txt:', error);
-        // Fallback to default song
-        
+    }
+}
+
+// Load duration for each song file
+async function loadSongDurations() {
+    for (let i = 0; i < songs.length; i++) {
+        try {
+            const audio = new Audio(songs[i].filename);
+            await new Promise((resolve, reject) => {
+                audio.addEventListener('loadedmetadata', () => {
+                    songDurations[i] = Math.floor(audio.duration);
+                    resolve();
+                });
+                audio.addEventListener('error', reject);
+                audio.load();
+            });
+        } catch (error) {
+            console.error(`Error loading duration for ${songs[i].filename}:`, error);
+            songDurations[i] = 0;
+        }
     }
 }
 
@@ -1090,103 +1232,14 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Load songs first
     await loadSongs();
     
-    // Initialize background audio
-    const audioPath = 'album/masters.mp3';
-    backgroundAudio = new Audio(audioPath);
-    console.log('Audio element created, src:', backgroundAudio.src);
-    backgroundAudio.loop = false; // Don't loop - we want to detect when it ends
-    backgroundAudio.volume = 1.0; // Set volume to 100%
-    backgroundAudio.preload = 'auto';
+    // Load first song (but don't play yet)
+    if (songs.length > 0) {
+        loadAndPlaySong(0, 0);
+        // Don't play yet - wait for user to click play
+    }
     
-    // Add error handling
-    backgroundAudio.addEventListener('error', (e) => {
-        console.error('Audio error event fired');
-        console.error('Audio error object:', backgroundAudio.error);
-        if (backgroundAudio.error) {
-            console.error('Error code:', backgroundAudio.error.code);
-            console.error('Error message:', backgroundAudio.error.message);
-            console.error('Audio src:', backgroundAudio.src);
-            console.error('Audio readyState:', backgroundAudio.readyState);
-        }
-    });
-    
-    // Track loading progress
-    backgroundAudio.addEventListener('loadstart', () => {
-        console.log('Audio load started');
-    });
-    
-    backgroundAudio.addEventListener('canplay', () => {
-        console.log('Audio can play, readyState:', backgroundAudio.readyState);
-    });
-    
-    // Get audio duration when metadata is loaded
-    backgroundAudio.addEventListener('loadedmetadata', () => {
-        console.log('Audio loaded, duration:', backgroundAudio.duration);
-        audioDuration = Math.floor(backgroundAudio.duration);
-        updateTimer(); // Update timer with total duration
-    });
-    
-    // Helper function to get readyState name
-    const getReadyStateName = (state) => {
-        const states = ['HAVE_NOTHING', 'HAVE_METADATA', 'HAVE_CURRENT_DATA', 'HAVE_FUTURE_DATA', 'HAVE_ENOUGH_DATA'];
-        return states[state] || 'UNKNOWN';
-    };
-    
-    // Force load
-    backgroundAudio.load();
-    
-    // Test audio file accessibility after a short delay
-    setTimeout(async () => {
-        try {
-            const testResponse = await fetch('album/masters.mp3', { method: 'HEAD' });
-            console.log('Audio file test - Status:', testResponse.status, testResponse.statusText);
-            console.log('Audio file test - Content-Type:', testResponse.headers.get('Content-Type'));
-            console.log('Audio file test - Content-Length:', testResponse.headers.get('Content-Length'));
-            if (!testResponse.ok) {
-                console.error('Audio file is not accessible! HTTP Status:', testResponse.status);
-            }
-        } catch (error) {
-            console.error('Error testing audio file:', error);
-        }
-        
-        // Log audio element state
-        console.log('Audio element state check:');
-        console.log('- src:', backgroundAudio.src);
-        console.log('- readyState:', backgroundAudio.readyState, '(' + getReadyStateName(backgroundAudio.readyState) + ')');
-        console.log('- networkState:', backgroundAudio.networkState);
-        console.log('- error:', backgroundAudio.error);
-        console.log('- paused:', backgroundAudio.paused);
-        console.log('- muted:', backgroundAudio.muted);
-        console.log('- volume:', backgroundAudio.volume);
-    }, 1000);
-    
-    // When audio ends, set timer to end and then reset
-    backgroundAudio.addEventListener('ended', () => {
-        // Set elapsed time to end (17:30)
-        elapsedTime = audioDuration;
-        updateTimer();
-        
-        // Stop the game
-        gameStarted = false;
-        
-        // Stop the timer
-        if (songTimer) {
-            clearInterval(songTimer);
-            songTimer = null;
-        }
-        
-        // Update play/stop icon to play
-        const playStopIcon = document.getElementById('playStopIcon');
-        if (playStopIcon) {
-            playStopIcon.textContent = '▶';
-            playStopIcon.innerHTML = '▶';
-        }
-        
-        // Wait a moment at 17:30, then reset everything
-        setTimeout(() => {
-            resetToInitialState();
-        }, 2000); // Wait 2 seconds at 17:30 before resetting
-    });
+    // Update timer with total duration
+    updateTimer();
     
     // Set up media session for media key controls
     if (navigator.mediaSession) {
@@ -1239,3 +1292,4 @@ window.addEventListener('DOMContentLoaded', async () => {
     loadSpriteSheet();
     initInfiniteScroll();
 });
+
