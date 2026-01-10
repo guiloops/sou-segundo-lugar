@@ -830,8 +830,16 @@ function handleMessageBoxClick() {
         // Update icon to stop
         if (playStopIcon) {
             const isMobile = window.innerWidth <= 768;
-            playStopIcon.textContent = isMobile ? 'II' : '⏸';
-            playStopIcon.innerHTML = isMobile ? 'II' : '⏸';
+            if (isMobile) {
+                // Use a better pause symbol for mobile
+                playStopIcon.textContent = '⏸';
+                playStopIcon.innerHTML = '⏸';
+                playStopIcon.style.fontSize = '14px';
+            } else {
+                playStopIcon.textContent = '⏸';
+                playStopIcon.innerHTML = '⏸';
+                playStopIcon.style.fontSize = '';
+            }
         }
         
         // Resume all scroll text animations

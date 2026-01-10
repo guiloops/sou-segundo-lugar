@@ -209,13 +209,6 @@ body {
     pointer-events: none !important;
 }
 
-/* Mobile-specific styling for pause icon */
-@media screen and (max-width: 768px) {
-    .start-message .play-stop-icon {
-        letter-spacing: -2px !important;
-        font-weight: bold !important;
-    }
-}
 
 .start-message .timer-text {
     position: absolute !important;
@@ -307,34 +300,41 @@ body {
         letter-spacing: 1px;
     }
     
-    /* Adjust start message box for mobile */
+    /* Adjust start message box for mobile - scale everything down */
     .start-message {
-        bottom: 20px !important;
-        right: 20px !important;
-        left: 20px !important;
-        padding: 12px 16px !important;
-        max-width: calc(100% - 40px) !important;
+        bottom: 15px !important;
+        right: 15px !important;
+        left: 15px !important;
+        padding: 8px 12px !important;
+        max-width: calc(100% - 30px) !important;
+        border-width: 2px !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
     }
     
     .start-message .main-text {
-        font-size: 28px !important;
-        letter-spacing: 2px !important;
+        font-size: 24px !important;
+        letter-spacing: 1.5px !important;
     }
     
     .start-message .author-text {
-        font-size: 14px !important;
+        font-size: 12px !important;
+        letter-spacing: 0.5px !important;
     }
     
     .start-message .play-stop-icon {
         font-size: 14px !important;
-        bottom: 8px !important;
-        left: 16px !important;
+        bottom: 6px !important;
+        left: 12px !important;
+        letter-spacing: 0 !important;
+        font-weight: normal !important;
+        line-height: 1 !important;
     }
     
     .start-message .timer-text {
-        font-size: 14px !important;
-        bottom: 8px !important;
-        left: 40px !important;
+        font-size: 12px !important;
+        bottom: 6px !important;
+        left: 32px !important;
+        letter-spacing: 0.5px !important;
     }
     
     /* Adjust song list box for mobile */
@@ -371,32 +371,39 @@ body {
     }
     
     .start-message {
-        bottom: 15px !important;
-        right: 15px !important;
-        left: 15px !important;
-        padding: 10px 14px !important;
-        max-width: calc(100% - 30px) !important;
+        bottom: 12px !important;
+        right: 12px !important;
+        left: 12px !important;
+        padding: 6px 10px !important;
+        max-width: calc(100% - 24px) !important;
+        border-width: 2px !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
     }
     
     .start-message .main-text {
-        font-size: 24px !important;
-        letter-spacing: 1.5px !important;
+        font-size: 20px !important;
+        letter-spacing: 1px !important;
     }
     
     .start-message .author-text {
-        font-size: 12px !important;
+        font-size: 11px !important;
+        letter-spacing: 0.5px !important;
     }
     
     .start-message .play-stop-icon {
         font-size: 12px !important;
-        bottom: 6px !important;
-        left: 14px !important;
+        bottom: 5px !important;
+        left: 10px !important;
+        letter-spacing: 0 !important;
+        font-weight: normal !important;
+        line-height: 1 !important;
     }
     
     .start-message .timer-text {
-        font-size: 12px !important;
-        bottom: 6px !important;
-        left: 35px !important;
+        font-size: 11px !important;
+        bottom: 5px !important;
+        left: 28px !important;
+        letter-spacing: 0.5px !important;
     }
     
     .song-list-box {
