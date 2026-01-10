@@ -395,15 +395,29 @@ function loadSpriteSheet() {
                 const startMessage = document.getElementById('startMessage');
                 if (startMessage) {
                     const messageRect = startMessage.getBoundingClientRect();
+                    const isMobile = window.innerWidth <= 768;
+                    // Adjust offsets for mobile
+                    const offsetX = isMobile ? CENTER_CHARACTER_OFFSET_X * 0.7 : CENTER_CHARACTER_OFFSET_X;
+                    const offsetY = isMobile ? CENTER_CHARACTER_OFFSET_Y * 0.7 : CENTER_CHARACTER_OFFSET_Y;
+                    const spacing = isMobile ? 15 : 20;
+                    
                     // Position above the message box, aligned to the left edge of the box
-                    const leftX = messageRect.left + CENTER_CHARACTER_OFFSET_X; // Align leftmost pixel of character with leftmost pixel of title box
-                    const aboveY = messageRect.top - SPRITE_HEIGHT * SCALE - 20 + CENTER_CHARACTER_OFFSET_Y; // Above the box with 20px spacing
-                    centerCharacter.x = leftX;
-                    centerCharacter.y = aboveY;
+                    const leftX = messageRect.left + offsetX;
+                    const aboveY = messageRect.top - SPRITE_HEIGHT * SCALE - spacing + offsetY;
+                    
+                    // Ensure character doesn't go off screen on mobile
+                    const minX = 10;
+                    const maxX = canvas.width - centerCharacter.width - 10;
+                    const minY = 70; // Below scroll bar
+                    const maxY = canvas.height - centerCharacter.height - 10;
+                    
+                    centerCharacter.x = Math.max(minX, Math.min(maxX, leftX));
+                    centerCharacter.y = Math.max(minY, Math.min(maxY, aboveY));
                 } else {
                     // Fallback to left side if message box not found
-                    centerCharacter.x = 30;
-                    centerCharacter.y = 100;
+                    const isMobile = window.innerWidth <= 768;
+                    centerCharacter.x = isMobile ? 15 : 30;
+                    centerCharacter.y = isMobile ? 80 : 100;
                 }
             }
         }
@@ -434,13 +448,27 @@ function loadSpriteSheet() {
             characters = [];
             // Position above the title box on the left
             const startMessage = document.getElementById('startMessage');
-            let centerX = 30; // Default left position
-            let centerY = 100; // Default top position
+            const isMobile = window.innerWidth <= 768;
+            let centerX = isMobile ? 15 : 30; // Default left position
+            let centerY = isMobile ? 80 : 100; // Default top position
             
             if (startMessage) {
                 const messageRect = startMessage.getBoundingClientRect();
-                centerX = messageRect.left + CENTER_CHARACTER_OFFSET_X; // Align with left edge of title box
-                centerY = messageRect.top - SPRITE_HEIGHT * SCALE - 20 + CENTER_CHARACTER_OFFSET_Y; // Above the box with 20px spacing
+                const offsetX = isMobile ? CENTER_CHARACTER_OFFSET_X * 0.7 : CENTER_CHARACTER_OFFSET_X;
+                const offsetY = isMobile ? CENTER_CHARACTER_OFFSET_Y * 0.7 : CENTER_CHARACTER_OFFSET_Y;
+                const spacing = isMobile ? 15 : 20;
+                
+                centerX = messageRect.left + offsetX;
+                centerY = messageRect.top - SPRITE_HEIGHT * SCALE - spacing + offsetY;
+                
+                // Ensure character doesn't go off screen on mobile
+                const minX = 10;
+                const maxX = canvas.width - SPRITE_WIDTH * SCALE - 10;
+                const minY = 70; // Below scroll bar
+                const maxY = canvas.height - SPRITE_HEIGHT * SCALE - 10;
+                
+                centerX = Math.max(minX, Math.min(maxX, centerX));
+                centerY = Math.max(minY, Math.min(maxY, centerY));
             }
             
             centerCharacter = new Character(centerX, centerY, true); // true = isCenterCharacter
@@ -452,6 +480,41 @@ function loadSpriteSheet() {
             // Add event listeners to canvas
             canvas.addEventListener('click', handleCanvasClick);
             canvas.addEventListener('mousemove', handleCanvasMouseMove);
+            
+            // Add touch support for mobile
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
+                const touchX = touch.clientX - rect.left;
+                const touchY = touch.clientY - rect.top;
+                
+                // Check if touch is on any character
+                let touchedCharacter = null;
+                for (let character of characters) {
+                    const charBounds = character.getBounds();
+                    if (touchX >= charBounds.x && 
+                        touchX <= charBounds.x + charBounds.width &&
+                        touchY >= charBounds.y && 
+                        touchY <= charBounds.y + charBounds.height) {
+                        touchedCharacter = character;
+                        break;
+                    }
+                }
+                
+                if (touchedCharacter) {
+                    toggleSongList();
+                } else {
+                    // Touch outside any character - close song list if open
+                    if (songListVisible) {
+                        const songListBox = document.getElementById('songListBox');
+                        if (songListBox) {
+                            songListBox.classList.remove('visible');
+                            songListVisible = false;
+                        }
+                    }
+                }
+            }, { passive: false });
         }, 100);
     };
     spriteSheet.onerror = () => {
